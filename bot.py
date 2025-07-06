@@ -59,7 +59,6 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler('start', start))
-    app.add_handler(CommandHandler('help', help_command))
     app.add_handler(MessageHandler(filters.CONTACT, bind_phone))
 
     print("🤖 Bot started and running!")
