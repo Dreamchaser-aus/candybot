@@ -23,12 +23,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     phone = update.message.contact.phone_number
+    username = update.effective_user.username or ""
+    first_name = update.effective_user.first_name or ""
+    last_name = update.effective_user.last_name or ""
+    # 组装用户名（优先 username，其次 first_name/last_name 拼起来）
+    nickname = username if username else (first_name + (last_name if last_name else ""))
     try:
-        resp = requests.post(BACKEND_API, json={"user_id": user_id, "phone": phone}, timeout=10)
+        resp = requests.post(
+            BACKEND_API,
+            json={
+                "user_id": user_id,
+                "phone": phone,
+                "username": nickname
+            },
+            timeout=10
+        )
         if resp.status_code == 200:
             await update.message.reply_text("✅ 绑定成功！请返回游戏页面开始畅玩。")
         else:
-            await update.message.reply_text("❌ 绑定失败，请稍后重试。")
+            await update.message.reply_text(f"❌ 绑定失败 [{resp.status_code}]：{resp.text}")
     except Exception as e:
         await update.message.reply_text(f"❌ 绑定失败，请联系管理员。\n{e}")
 
