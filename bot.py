@@ -9,11 +9,14 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 
-
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BACKEND_API = os.getenv("BACKEND_API")
+BACKEND_API = os.getenv("BACKEND_API")  # 例: https://candybackend-production.up.railway.app/bind
 
+if not BOT_TOKEN or not BACKEND_API:
+    raise Exception("❌ 环境变量 BOT_TOKEN 或 BACKEND_API 未设置！")
+
+# /start 命令
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[KeyboardButton("📱 发送手机号", request_contact=True)]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
@@ -24,15 +27,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    phone = update.message.contact.phone_number
-    username = update.effective_user.username or ""
-    first_name = update.effective_user.first_name or ""
-    last_name = update.effective_user.last_name or ""
-    nickname = username if username else (first_name + (last_name if last_name else ""))
+# /help 命令
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 发送 /start 开始绑定手机号。\n"
+        "如遇到任何问题请联系管理员。"
+    )
 
+# 绑定手机号处理
+async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
+        if not update.message or not update.message.contact:
+            await update.message.reply_text("❌ 未收到手机号，请重新点击按钮。")
+            return
+
+        user_id = update.effective_user.id
+        phone = update.message.contact.phone_number
+        username = update.effective_user.username or ""
+        first_name = update.effective_user.first_name or ""
+        last_name = update.effective_user.last_name or ""
+        nickname = username if username else (first_name + (last_name if last_name else ""))
+
+        # 调用后端API进行绑定
         resp = requests.post(
             BACKEND_API,
             json={
@@ -43,7 +59,7 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=10
         )
         if resp.status_code == 200:
-            # 发带 WebApp 的按钮
+            # 发送 WebApp 按钮
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🚀 进入游戏", web_app=WebAppInfo(url="https://candyfrontend-production.up.railway.app/"))]
             ])
@@ -53,12 +69,14 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(f"❌ 绑定失败 [{resp.status_code}]：{resp.text}")
+
     except Exception as e:
         await update.message.reply_text(f"❌ 绑定失败，请联系管理员。\n{e}")
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler('help', help_command))
     app.add_handler(MessageHandler(filters.CONTACT, bind_phone))
 
     print("🤖 Bot started and running!")
