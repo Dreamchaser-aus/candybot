@@ -26,8 +26,8 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or ""
     first_name = update.effective_user.first_name or ""
     last_name = update.effective_user.last_name or ""
-    # 组装用户名（优先 username，其次 first_name/last_name 拼起来）
     nickname = username if username else (first_name + (last_name if last_name else ""))
+
     try:
         resp = requests.post(
             BACKEND_API,
@@ -39,14 +39,18 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=10
         )
         if resp.status_code == 200:
-            await update.message.reply_text("✅ 绑定成功！请返回游戏页面开始畅玩。")
+            # 发带 WebApp 的按钮
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 进入游戏", web_app=WebAppInfo(url="https://candyfrontend-production.up.railway.app/"))]
+            ])
+            await update.message.reply_text(
+                "✅ 绑定成功！点击下方按钮直接进入游戏：",
+                reply_markup=keyboard
+            )
         else:
             await update.message.reply_text(f"❌ 绑定失败 [{resp.status_code}]：{resp.text}")
     except Exception as e:
         await update.message.reply_text(f"❌ 绑定失败，请联系管理员。\n{e}")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("输入 /start 开始绑定手机号。\n如有问题请联系管理员。")
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
