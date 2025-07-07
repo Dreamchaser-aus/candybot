@@ -106,7 +106,3 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    init_tables()   # 自动建表
-    fix_token_type()  # ★★ 这里加上，自动修正 token 字段为整数
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, host="0.0.0.0", port=port)
