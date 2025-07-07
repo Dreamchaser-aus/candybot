@@ -11,19 +11,17 @@ from telegram.ext import (
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BACKEND_API = os.getenv("BACKEND_API")  # 例: https://candybackend-production.up.railway.app/bind
+BACKEND_API = os.getenv("BACKEND_API")  # 例: https://candybackend-production.up.railway.app/user/bind
 
 if not BOT_TOKEN or not BACKEND_API:
     raise Exception("❌ 环境变量 BOT_TOKEN 或 BACKEND_API 未设置！")
 
-
+# /start 命令，自动识别邀请人参数
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 判断是否携带inviter
     inviter = None
     if context.args and len(context.args) > 0:
-        if context.args[0].startswith('inv'):
-            inviter = context.args[0][3:]
-            context.user_data['inviter'] = inviter  # 临时存到 user_data
+        inviter = context.args[0]
+        context.user_data['inviter'] = inviter
     keyboard = [[KeyboardButton("📱 发送手机号", request_contact=True)]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     await update.message.reply_text(
@@ -31,6 +29,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• 用于安全验证和游戏权益保障\n"
         "• 信息绝不外泄，仅做身份识别",
         reply_markup=reply_markup
+    )
+
+# /share 命令，生成专属邀请链接
+async def share_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    bot_username = context.bot.username
+    invite_link = f"https://t.me/{bot_username}?start={user_id}"
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔗 点击邀请好友", url=invite_link)]
+    ])
+    await update.message.reply_text(
+        f"🎉 你的专属邀请链接：\n\n{invite_link}\n\n"
+        "邀请好友通过你的专属链接进入并绑定手机号，你将获得额外Token奖励！",
+        reply_markup=keyboard
     )
 
 # /help 命令
@@ -53,9 +65,8 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         first_name = update.effective_user.first_name or ""
         last_name = update.effective_user.last_name or ""
         nickname = username if username else (first_name + (last_name if last_name else ""))
-        inviter = context.user_data.get('inviter')  # 读取刚刚临时存储的inviter
 
-        # 调用后端API进行绑定
+        inviter = context.user_data.get('inviter')  # 如果有，通过/start带进来的
         payload = {
             "user_id": user_id,
             "phone": phone,
@@ -70,7 +81,7 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=10
         )
         if resp.status_code == 200:
-            # 发送 WebApp 按钮
+            # 发送 WebApp 按钮（根据你的实际游戏入口）
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🚀 进入游戏", web_app=WebAppInfo(url="https://candyfrontend-production.up.railway.app/"))]
             ])
@@ -83,11 +94,12 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"❌ 绑定失败，请联系管理员。\n{e}")
-        
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('help', help_command))
+    app.add_handler(CommandHandler('share', share_command))
     app.add_handler(MessageHandler(filters.CONTACT, bind_phone))
 
     print("🤖 Bot started and running!")
@@ -95,4 +107,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
