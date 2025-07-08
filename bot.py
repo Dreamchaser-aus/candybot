@@ -121,7 +121,7 @@ async def send_leaderboard(context, chat_id):
 
         data = res.json()
         msg = "🏆 当前排行榜（Top 10）：\n"
-        for idx, entry in enumerate(data):
+        for idx, entry in enumerate(data[:10]):
             masked = mask_phone(entry['phone'])
             score = entry['max_score']
             msg += f"{idx + 1}. {masked}: {score}\n"
