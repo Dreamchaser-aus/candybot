@@ -123,7 +123,7 @@ async def send_leaderboard(context, chat_id):
         msg = "🏆 当前排行榜（Top 10）：\n"
         for idx, entry in enumerate(data):
             masked = mask_phone(entry['phone'])
-            score = entry['highest_score']
+            score = entry['max_score']
             msg += f"{idx + 1}. {masked}: {score}\n"
 
         await context.bot.send_message(chat_id=chat_id, text=msg)
