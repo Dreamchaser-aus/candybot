@@ -6,17 +6,26 @@ from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 )
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
 )
+from telegram.ext import JobQueue
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-BACKEND_API = os.getenv("BACKEND_API")  # 例: https://candybackend-production.up.railway.app/user/bind
+BACKEND_API = os.getenv("BACKEND_API")
+LEADERBOARD_API = os.getenv("LEADERBOARD_API")  # 例: https://candybackend-production.up.railway.app/leaderboard
+GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")      # 群组 chat_id，如 "-1001234567890"
 
-if not BOT_TOKEN or not BACKEND_API:
-    raise Exception("❌ 环境变量 BOT_TOKEN 或 BACKEND_API 未设置！")
+if not BOT_TOKEN or not BACKEND_API or not LEADERBOARD_API or not GROUP_CHAT_ID:
+    raise Exception("❌ 请在 .env 中配置 BOT_TOKEN、BACKEND_API、LEADERBOARD_API、GROUP_CHAT_ID！")
 
-# /start 命令，自动识别邀请人参数
+def mask_phone(phone: str) -> str:
+    if len(phone) >= 7:
+        return phone[:3] + "****" + phone[-4:]
+    return phone
+
+# /start 命令
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inviter = None
     if context.args and len(context.args) > 0:
@@ -31,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-# /share 命令，生成专属邀请链接
+# /share 命令
 async def share_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     bot_username = context.bot.username
@@ -52,7 +61,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "如遇到任何问题请联系管理员。"
     )
 
-# 绑定手机号处理
+# 绑定手机号
 async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not update.message or not update.message.contact:
@@ -66,7 +75,7 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         last_name = update.effective_user.last_name or ""
         nickname = username if username else (first_name + (last_name if last_name else ""))
 
-        inviter = context.user_data.get('inviter')  # 如果有，通过/start带进来的
+        inviter = context.user_data.get('inviter')
         payload = {
             "user_id": user_id,
             "phone": phone,
@@ -81,7 +90,6 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             timeout=10
         )
         if resp.status_code == 200:
-            # 发送 WebApp 按钮（根据你的实际游戏入口）
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🚀 进入游戏", web_app=WebAppInfo(url="https://candyfrontend-production.up.railway.app/"))]
             ])
@@ -95,12 +103,45 @@ async def bind_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ 绑定失败，请联系管理员。\n{e}")
 
+# /leaderboard 命令（手动查看）
+async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_leaderboard(context, update.effective_chat.id)
+
+# 自动发送排行榜（每 3 小时）
+async def auto_send_leaderboard(context: ContextTypes.DEFAULT_TYPE):
+    await send_leaderboard(context, GROUP_CHAT_ID)
+
+# 排行榜逻辑
+async def send_leaderboard(context, chat_id):
+    try:
+        res = requests.get(LEADERBOARD_API, timeout=10)
+        if res.status_code != 200:
+            await context.bot.send_message(chat_id=chat_id, text="❌ 无法获取排行榜，请稍后再试。")
+            return
+
+        data = res.json()
+        msg = "🏆 当前排行榜（Top 10）：\n"
+        for idx, entry in enumerate(data):
+            masked = mask_phone(entry['phone'])
+            score = entry['highest_score']
+            msg += f"{idx + 1}. {masked}: {score}\n"
+
+        await context.bot.send_message(chat_id=chat_id, text=msg)
+
+    except Exception as e:
+        await context.bot.send_message(chat_id=chat_id, text=f"❌ 获取排行榜失败：{e}")
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('share', share_command))
+    app.add_handler(CommandHandler('leaderboard', leaderboard_command))
     app.add_handler(MessageHandler(filters.CONTACT, bind_phone))
+
+    job_queue: JobQueue = app.job_queue
+    # 每 3 小时执行一次，立即开始
+    job_queue.run_repeating(auto_send_leaderboard, interval=3*60*60, first=0)
 
     print("🤖 Bot started and running!")
     app.run_polling()
