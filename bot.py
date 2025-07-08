@@ -136,7 +136,8 @@ async def send_leaderboard(context, chat_id):
             else:
                 prefix = f"{idx + 1}️⃣"
 
-            msg += f"{prefix} {idx + 1}. {masked} — {score} 分\n"
+            # ⚡ 这里去掉编号，只显示 emoji + 手机号 + 分数
+            msg += f"{prefix} {masked} — {score} 分\n"
 
         msg += "\n🔥 继续挑战，争取冲到榜首吧！"
         await context.bot.send_message(chat_id=chat_id, text=msg)
