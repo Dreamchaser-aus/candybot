@@ -14,11 +14,11 @@ from telegram.ext import JobQueue
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BACKEND_API = os.getenv("BACKEND_API")
-LEADERBOARD_API = os.getenv("LEADERBOARD_API")  # 例: https://candybackend-production.up.railway.app/leaderboard
-GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")      # 群组 chat_id，如 "-1001234567890"
+LEADERBOARD_API = os.getenv("LEADERBOARD_API")
+GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 
 if not BOT_TOKEN or not BACKEND_API or not LEADERBOARD_API or not GROUP_CHAT_ID:
-    raise Exception("❌ 请在 .env 中配置 BOT_TOKEN、BACKEND_API、LEADERBOARD_API、GROUP_CHAT_ID！")
+    raise Exception("❌ 请在 .env 文件中配置 BOT_TOKEN、BACKEND_API、LEADERBOARD_API、GROUP_CHAT_ID！")
 
 def mask_phone(phone: str) -> str:
     if len(phone) >= 7:
@@ -120,12 +120,25 @@ async def send_leaderboard(context, chat_id):
             return
 
         data = res.json()
-        msg = "🏆 当前排行榜（Top 10）：\n"
+        msg = "🏆 今日 TOP10 排行榜\n\n"
         for idx, entry in enumerate(data[:10]):
             masked = mask_phone(entry['phone'])
             score = entry['max_score']
-            msg += f"{idx + 1}. {masked}: {score}\n"
 
+            if idx == 0:
+                prefix = "👑"
+            elif idx == 1:
+                prefix = "🥈"
+            elif idx == 2:
+                prefix = "🥉"
+            elif idx == 9:
+                prefix = "🔟"
+            else:
+                prefix = f"{idx + 1}️⃣"
+
+            msg += f"{prefix} {idx + 1}. {masked} — {score} 分\n"
+
+        msg += "\n🔥 继续挑战，争取冲到榜首吧！"
         await context.bot.send_message(chat_id=chat_id, text=msg)
 
     except Exception as e:
@@ -140,8 +153,10 @@ def main():
     app.add_handler(MessageHandler(filters.CONTACT, bind_phone))
 
     job_queue: JobQueue = app.job_queue
-    # 每 3 小时执行一次，立即开始
-    job_queue.run_repeating(auto_send_leaderboard, interval=3*60*60, first=0)
+    if job_queue:
+        job_queue.run_repeating(auto_send_leaderboard, interval=3*60*60, first=0)
+    else:
+        print("⚠️ JobQueue 未启用，自动发送排行榜将无法运行。")
 
     print("🤖 Bot started and running!")
     app.run_polling()
