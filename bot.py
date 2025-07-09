@@ -21,8 +21,8 @@ if not BOT_TOKEN or not BACKEND_API or not LEADERBOARD_API or not GROUP_CHAT_ID:
     raise Exception("❌ 请在 .env 文件中配置 BOT_TOKEN、BACKEND_API、LEADERBOARD_API、GROUP_CHAT_ID！")
 
 def mask_phone(phone: str) -> str:
-    if len(phone) >= 7:
-        return phone[:3] + "****" + phone[-2:]
+    if len(phone) >= 6:
+        return phone[:4] + "*" * (len(phone) - 6) + phone[-2:]
     return phone
 
 # /start 命令
