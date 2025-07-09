@@ -22,7 +22,7 @@ if not BOT_TOKEN or not BACKEND_API or not LEADERBOARD_API or not GROUP_CHAT_ID:
 
 def mask_phone(phone: str) -> str:
     if len(phone) >= 7:
-        return phone[:3] + "****" + phone[-4:]
+        return phone[:3] + "****" + phone[-2:]
     return phone
 
 # /start 命令
